@@ -306,17 +306,62 @@ Six profiles were tested: three normal use-cases and three adversarial edge case
 
 ---
 
+## Accuracy and Surprises
+
+### Does the pop/happy result "feel" right?
+
+**Yes — with one caveat.** Sunrise City at #1 makes intuitive sense: it is a bright, danceable pop song that perfectly matches the happy/pop profile. Gym Hero at #2 also fits — it is high-energy pop. The surprise is that **Rooftop Lights (indie pop) consistently beats any non-pop song** even when other songs are numerically closer, purely because of the mood bonus. That feels slightly off: an indie pop song you have never heard of outranking a synthwave track with nearly identical numeric features just because its mood tag says "happy."
+
+### Why does Sunrise City rank first? (weight breakdown)
+
+```text
+Sunrise City vs. pop/happy profile
+────────────────────────────────────────────────────────────
+  genre match (+2.0)   ← categorical bonus, fixed
+  mood  match (+1.0)   ← categorical bonus, fixed
+  energy  1.0 − |0.82 − 0.80| = +0.98
+  tempo   (1.0 − |118 − 120| / 80) × 0.5 = +0.49
+  valence (1.0 − |0.84 − 0.85|) × 0.5   = +0.49
+  dance   (1.0 − |0.79 − 0.80|) × 0.5   = +0.49
+  acoustic(1.0 − |0.18 − 0.20|) × 0.5   = +0.49
+  ────────────────────────────────────────────────
+  TOTAL = 5.95
+```
+
+The categorical bonuses (genre + mood = **3.0**) account for more than half the score. The maximum a song can earn from all five numeric features combined is also **3.0** — meaning a song that matches genre AND mood starts with a score ceiling equal to a numerically perfect song that matches neither. This is the fundamental weight imbalance.
+
+### The genre weight problem — by the numbers
+
+| Score source | Max possible | % of numeric ceiling |
+| --- | --- | --- |
+| All 5 numeric features (perfect match) | 3.0 | 100% |
+| Genre match alone | 2.0 | **67%** |
+| Mood match alone | 1.0 | **33%** |
+| Genre + Mood combined | 3.0 | **100%** |
+
+**Implication:** A song that matches genre and mood but scores 0 on every numeric feature would still tie a numerically perfect song in a different genre. In a 10-song catalog, this means the genre label almost always determines the winner before the numbers are even considered.
+
+### The jazz edge case proves it
+
+The jazz/happy profile deliberately matched Sunrise City's numerics exactly (energy=0.82, tempo=118, valence=0.84 …) but asked for `genre=jazz`. The result:
+
+```text
+Sunrise City    total=4.00  (mood +1.0, all numerics perfect)
+Coffee Shop     total=3.83  (genre +2.0, numerics mediocre)
+```
+
+Sunrise City still wins — but only barely (4.00 vs 3.83). Coffee Shop Stories, which sounds nothing like what a pop-music fan would want, nearly defeats a song with a **perfect numeric match** on every single dimension. The margin is just 0.17 points.
+
+### Should the genre weight be reduced?
+
+Given a small 10-song catalog, reducing the genre weight from 2.0 to 1.0 would make numeric features competitive. The trade-off is that a user who cares deeply about genre (e.g., "I only listen to lofi") might get results that feel acoustically correct but genre-wrong. The right weight depends on what the designer believes users care about more: sound similarity or genre label.
+
 ## Limitations and Risks
 
-Summarize some limitations of your recommender.
-
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
+- **Tiny catalog:** 10 songs means any genre with only one entry (rock, ambient, jazz) produces a very shallow ranked list after the #1 result.
+- **No lyric or artist awareness:** Two songs with identical numeric features are treated as identical — even if one is universally loved and the other is obscure.
+- **Genre/mood label dependency:** The entire ranking can flip based on how a song is tagged. "Indie pop" does not match "pop," so Rooftop Lights never gets the genre bonus even though it sounds like a pop song.
+- **Single-context profile:** The system cannot distinguish a user's gym playlist from their study playlist — one flat profile is used for all listening contexts.
 
 ---
 
