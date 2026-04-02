@@ -180,11 +180,129 @@ You can add more tests in `tests/test_recommender.py`.
 
 ## Experiments You Tried
 
-Use this section to document the experiments you ran. For example:
+Six profiles were tested: three normal use-cases and three adversarial edge cases designed to probe weaknesses in the scoring logic.
 
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+---
+
+### Profile 1 — High-Energy Pop
+
+```text
+================================================================
+                         High-Energy Pop
+================================================================
+  genre=pop  mood=happy  energy=0.9  tempo=128
+----------------------------------------------------------------
+  #1  Sunrise City  (Neon Echo)       Score: 5.77
+         • genre match (+2.0) | mood match (+1.0) | energy similarity (+0.92) ...
+  #2  Gym Hero  (Max Pulse)           Score: 4.88
+         • genre match (+2.0) | energy similarity (+0.97) ...
+  #3  Rooftop Lights  (Indigo Parade) Score: 3.66
+         • mood match (+1.0) | energy similarity (+0.86) ...
+================================================================
+```
+
+**Observation:** Clean result. Both pop songs with genre match land at #1 and #2. Rooftop Lights (indie pop) claims #3 via the mood bonus alone — shows the genre filter is strict.
+
+---
+
+### Profile 2 — Chill Lofi
+
+```text
+================================================================
+                           Chill Lofi
+================================================================
+  genre=lofi  mood=chill  energy=0.35  tempo=75
+----------------------------------------------------------------
+  #1  Library Rain  (Paper Lanterns)  Score: 5.93
+         • genre match (+2.0) | mood match (+1.0) | energy similarity (+1.00) ...
+  #2  Midnight Coding  (LoRoom)       Score: 5.82
+         • genre match (+2.0) | mood match (+1.0) | energy similarity (+0.93) ...
+  #3  Focus Flow  (LoRoom)            Score: 4.88
+         • genre match (+2.0) | energy similarity (+0.95) ...
+================================================================
+```
+
+**Observation:** Perfect case — genre + mood bonuses dominate and the top 3 are all genuinely lofi. Library Rain scores a rare `+1.00` energy similarity (energy=0.35 exactly matches preference).
+
+---
+
+### Profile 3 — Deep Intense Rock
+
+```text
+================================================================
+                        Deep Intense Rock
+================================================================
+  genre=rock  mood=intense  energy=0.92  tempo=150
+----------------------------------------------------------------
+  #1  Storm Runner  (Voltline)        Score: 5.95
+         • genre match (+2.0) | mood match (+1.0) | energy similarity (+0.99) ...
+  #2  Gym Hero  (Max Pulse)           Score: 3.59
+         • mood match (+1.0) | energy similarity (+0.99) ...
+  #3  Night Drive Loop  (Neon Echo)   Score: 2.45
+         • energy similarity (+0.83) ...
+================================================================
+```
+
+**Observation:** Only one rock song exists in the catalog, so #2 onward is decided purely by numeric similarity. Gym Hero's intense mood rescues its rank even though it is pop.
+
+---
+
+### EDGE Profile 4 — High Energy + Sad Mood (conflicting)
+
+```text
+================================================================
+           EDGE: High Energy + Sad Mood (conflicting)
+================================================================
+  genre=ambient  mood=sad  energy=0.95  tempo=60
+----------------------------------------------------------------
+  #1  Spacewalk Thoughts  (Orbit Bloom)  Score: 4.04
+         • genre match (+2.0) | energy similarity (+0.33) ...
+  #2  Library Rain  (Paper Lanterns)     Score: 1.96
+  #3  Midnight Coding  (LoRoom)          Score: 1.92
+================================================================
+```
+
+**What went wrong:** No song has `mood=sad`, so the +1.0 mood bonus is never awarded. The system still returns Spacewalk Thoughts at #1 purely because of the genre match (+2.0) — even though Spacewalk Thoughts has energy=0.28, the total opposite of what this user wants (energy=0.95). **The genre bonus masks a terrible numeric fit.**
+
+---
+
+### EDGE Profile 5 — Genre Miss (all numerics match pop, genre=jazz)
+
+```text
+================================================================
+   EDGE: Genre Miss — every feature matches pop but genre=jazz
+================================================================
+  genre=jazz  mood=happy  energy=0.82  tempo=118
+----------------------------------------------------------------
+  #1  Sunrise City  (Neon Echo)       Score: 4.00
+         • mood match (+1.0) | energy similarity (+1.00) | all others ~+0.50
+  #2  Coffee Shop Stories  (Slow Stereo) Score: 3.83
+         • genre match (+2.0) | energy similarity (+0.55) ...
+  #3  Rooftop Lights  (Indigo Parade) Score: 3.79
+         • mood match (+1.0) | energy similarity (+0.94) ...
+================================================================
+```
+
+**What went wrong:** Sunrise City is numerically a near-perfect match (energy +1.00, all others ~+0.50) but misses the genre bonus. Coffee Shop Stories — a jazz song with mediocre numeric similarity — jumps to #2 solely because of the genre match. **A song that sounds nothing like what the user wants beats a near-perfect numeric match because it has the right genre label.**
+
+---
+
+### EDGE Profile 6 — All-Zeros Numeric Profile
+
+```text
+================================================================
+                 EDGE: All-zeros numeric profile
+================================================================
+  genre=lofi  mood=chill  energy=0.0  tempo=0
+----------------------------------------------------------------
+  #1  Library Rain  (Paper Lanterns)  Score: 4.18
+         • genre match (+2.0) | mood match (+1.0) | energy similarity (+0.65) ...
+  #2  Midnight Coding  (LoRoom)       Score: 4.15
+  #3  Focus Flow  (LoRoom)            Score: 3.12
+================================================================
+```
+
+**Observation:** Even with nonsensical numeric preferences (energy=0, tempo=0 BPM), the genre + mood bonuses dominate and the ranking stays sensible. The numeric scores are all low but non-zero because `1.0 - abs(song_val - 0.0) = 1.0 - song_val`, which still produces a non-negative number. The system degrades gracefully rather than crashing.
 
 ---
 
