@@ -306,6 +306,60 @@ Six profiles were tested: three normal use-cases and three adversarial edge case
 
 ---
 
+## Data Experiments
+
+Two experiments were run against the same six profiles to test how sensitive the ranking is to weight changes. The math was verified by checking that every component stays in a valid range (energy 0–1, tempo 0–0.5, valence/dance/acoustic 0–0.5) and that no score goes negative.
+
+---
+
+### Experiment A — Weight Shift: genre ÷2, energy ×2
+
+**Change:** Genre bonus reduced from `+2.0` → `+1.0`. Energy weight increased from `×1.0` → `×2.0`.
+
+**New score ceiling:**
+
+| Source | Baseline | Experiment A |
+| --- | --- | --- |
+| Genre match | 2.0 | 1.0 |
+| Mood match | 1.0 | 1.0 |
+| Energy (max) | 1.0 | 2.0 |
+| Tempo + Valence + Dance + Acoustic (max each 0.5) | 2.0 | 2.0 |
+| **Total ceiling** | **6.0** | **6.0** |
+
+The ceiling stays the same — the experiment redistributes weight, it does not inflate scores.
+
+**Key ranking changes observed:**
+
+| Profile | Baseline #1 | Exp A #1 | Change |
+| --- | --- | --- | --- |
+| High-Energy Pop | Sunrise City (5.77) | Sunrise City (5.69) | No change |
+| Chill Lofi | Library Rain (5.93) | Library Rain (5.93) | No change |
+| Deep Intense Rock | Storm Runner (5.94) | Storm Runner (5.94) | No change |
+| **EDGE: Jazz/Happy** | Sunrise City (4.00) vs Coffee Shop #2 (3.83) | **Sunrise City (5.00) vs Coffee Shop #5 (3.38)** | Coffee Shop drops 3 places |
+
+**Conclusion — more accurate or just different?**
+For normal profiles, **no rank changes** — both genre and energy were already strong enough that halving one and doubling the other cancels out for well-matched songs. The improvement is in the edge case: Coffee Shop Stories (a mediocre match) no longer threatens the #1 spot. The jazz edge case gap widens from 0.17 pts to 1.62 pts, making numeric similarity more decisive. **More accurate.**
+
+---
+
+### Experiment B — Feature Removal: mood check commented out
+
+**Change:** The `if mood match: +1.0` block was commented out entirely.
+
+**Key ranking changes observed:**
+
+| Profile | Baseline | Exp B | What changed |
+| --- | --- | --- | --- |
+| High-Energy Pop | #1 Sunrise City | **#1 Gym Hero** | Gym Hero had slightly better energy/dance — mood was masking this |
+| Chill Lofi | #1 Library Rain, #2 Midnight Coding | #1 Library Rain, **#2 Focus Flow** | Focus Flow was being held back by missing the mood bonus |
+| Deep Intense Rock | #2 Gym Hero (3.59) | #2 Gym Hero (2.59) | Score drops 1.0 pt — Gym Hero was leaning on its mood match |
+| **EDGE: Jazz/Happy** | #1 Sunrise City (4.00) | **#1 Coffee Shop (3.83)** | Without mood, Sunrise City loses +1.0 and Coffee Shop's genre bonus wins |
+
+**Conclusion — more accurate or just different?**
+Removing mood produces **surprising regressions**. In the jazz/happy edge case, the genre-biased Coffee Shop now takes #1 — worse than baseline. In High-Energy Pop, Gym Hero steals #1 from Sunrise City: this is debatable (Gym Hero has higher energy and danceability), but Sunrise City "feels" more like a happy pop song. **Mood adds meaningful signal; removing it makes the rankings less intuitive, not more.**
+
+---
+
 ## Accuracy and Surprises
 
 ### Does the pop/happy result "feel" right?
